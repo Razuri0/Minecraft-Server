@@ -57,7 +57,7 @@ docker compose ps
 docker compose logs -f server
 ```
 
-5. Connect Minecraft client to your server host/IP on port `25565`.
+5. open Nginx Admin portal 
 
 ## Common Operations
 

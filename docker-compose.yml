@@ -13,7 +13,6 @@ services:
       TYPE: "FABRIC"
       VERSION: "1.21.11"
       FABRIC_VERSION: "0.18.5"
-      MEMORY: "10G"
       JVM_OPTS: >
         -Xms10G
         -Xmx10G
@@ -32,7 +31,7 @@ services:
       - minecraft-network
 
 # Miniserve: A simple and efficient file server for sharing files over HTTP.
-# for sharing modpacks, configs, and other files related to the Minecraft server.
+# for sharing modpack, configs, and other files related to the Minecraft server.
   miniserve:
     image: svenstaro/miniserve:latest
     container_name: miniserve
@@ -74,6 +73,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "25565:25565"  # Minecraft server proxy
       - "81:81"   # Admin UI
     volumes:
       - ./npm/data:/data
@@ -83,15 +83,15 @@ services:
       - minecraft-network
 
 # DDNS Client for DuckDNS
-# keeps your dynamic IP address updated with DuckDNS
+# keeps your dynamic IP address updated with DuckDNS Domain
   ddns:
     image: lscr.io/linuxserver/duckdns:latest
     container_name: ddns
     restart: always
     environment:
-      - TZ=Europe/Berlin
-      - SUBDOMAINS=<DUCKDNS_SUBDOMAIN>
-      - TOKEN=<DUCKDNS_TOKEN>
+      - TZ=Europe/Berlin # Set your timezone
+      - SUBDOMAINS=<DUCKDNS_SUBDOMAIN> # Your DuckDNS subdomain (without .duckdns.org)
+      - TOKEN=<DUCKDNS_TOKEN> # Your DuckDNS token
       - PUID=1000
       - PGID=1000
     networks:
