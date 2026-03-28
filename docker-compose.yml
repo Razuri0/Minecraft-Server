@@ -60,8 +60,6 @@ services:
       - POLICY_FNAME=/data/cfg/botPolicy.yaml
     volumes:
       - ./botPolicy.yaml:/data/cfg/botPolicy.yaml:ro
-    ports:
-      - "8923:8923"
     networks:
       - file-network
     depends_on:
