@@ -1,0 +1,107 @@
+services:
+
+# Minecraft Server
+# Using Java 25 for newer JVM arguments, and Fabric for modding
+  server:
+    image: itzg/minecraft-server:java25
+    container_name: minecraft-server
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    environment:
+      EULA: "TRUE"
+      TYPE: "FABRIC"
+      VERSION: "1.21.11"
+      FABRIC_VERSION: "0.18.5"
+      MEMORY: "10G"
+      JVM_OPTS: >
+        -Xms10G
+        -Xmx10G
+        -XX:+UseShenandoahGC
+        -XX:ShenandoahGCMode=generational
+        -XX:+AlwaysPreTouch
+        -XX:+DisableExplicitGC
+        -XX:+PerfDisableSharedMem
+        -XX:+UseStringDeduplication
+        -XX:+UseCompactObjectHeaders 
+        -XX:+UseDynamicNumberOfGCThreads 
+        -XX:+ParallelRefProcEnabled
+    volumes:
+      - ./serverdata:/data
+    networks:
+      - minecraft-network
+
+# Miniserve: A simple and efficient file server for sharing files over HTTP.
+# for sharing modpacks, configs, and other files related to the Minecraft server.
+  miniserve:
+    image: svenstaro/miniserve:latest
+    container_name: miniserve
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    # Command arguments:
+    # -v: Verbose logging
+    # --enable-tar: Allow downloading directories as TAR
+    # --enable-zip: Allow downloading directories as ZIP
+    # /data: The directory inside the container to serve
+    command: -v --enable-tar --enable-zip /data
+    networks:
+      - file-network
+
+# Anubis
+# A lightweight reverse proxy and bot mitigation tool to protect the Miniserve file server from malicious bots and crawlers.
+  anubis:
+    image: ghcr.io/techarohq/anubis:latest
+    container_name: anubis
+    restart: always
+    environment:
+      - BIND=:8923
+      - TARGET=http://miniserve:8080
+      - POLICY_FNAME=/data/cfg/botPolicy.yaml
+    volumes:
+      - ./botPolicy.yaml:/data/cfg/botPolicy.yaml:ro
+    ports:
+      - "8923:8923"
+    networks:
+      - file-network
+    depends_on:
+      - miniserve
+
+# Nginx Proxy Manager
+# for managing reverse proxies, SSL certificates, and access control for the Minecraft server and Miniserve.
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"   # Admin UI
+    volumes:
+      - ./npm/data:/data
+      - ./npm/letsencrypt:/etc/letsencrypt
+    networks:
+      - file-network
+      - minecraft-network
+
+# DDNS Client for DuckDNS
+# keeps your dynamic IP address updated with DuckDNS
+  ddns:
+    image: lscr.io/linuxserver/duckdns:latest
+    container_name: ddns
+    restart: always
+    environment:
+      - TZ=Europe/Berlin
+      - SUBDOMAINS=<DUCKDNS_SUBDOMAIN>
+      - TOKEN=<DUCKDNS_TOKEN>
+      - PUID=1000
+      - PGID=1000
+    networks:
+      - file-network
+      - minecraft-network
+
+networks:
+  minecraft-network:
+    external: false
+  file-network:
+    external: false

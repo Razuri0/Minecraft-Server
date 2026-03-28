@@ -1,0 +1,61 @@
+# botPolicy.yaml for miniserve file server
+
+bots:
+  # --- Import Anubis built-in rulesets ---
+  # Blocks known pathological bots (malformed UAs, scanners, etc.)
+  - import: "(data)/bots/_deny-pathological.yaml"
+
+  # Blocks AI crawlers (GPTBot, ClaudeBot, Amazonbot, etc.)
+  - import: "(data)/bots/ai-robots-txt.yaml"
+
+  # Allows known good crawlers (Googlebot, Bingbot verified by IP)
+  - import: "(data)/crawlers/_allow-good.yaml"
+
+  # Keeps basic internet functioning (health checks, etc.)
+  - import: "(data)/common/keep-internet-working.yaml"
+
+  # --- Custom rules ---
+
+  # Allow local/private network without challenge
+  - name: internal-network
+    action: ALLOW
+    remote_addresses:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+      - 127.0.0.0/8
+      - fc00::/7
+
+  # Allow robots.txt and favicon without challenge
+  - name: robots-txt
+    path_regex: >-
+      ^/robots\.txt$
+    action: ALLOW
+
+  - name: favicon
+    path_regex: >-
+      ^/favicon\.ico$
+    action: ALLOW
+
+  # Block Cloudflare Workers (often used by scrapers)
+  - name: block-cloudflare-workers
+    headers_regex:
+      CF-Worker: .*
+    action: DENY
+
+  # Challenge all real browsers (Mozilla-based = every real browser)
+  - name: generic-browser
+    user_agent_regex: >-
+      Mozilla
+    action: CHALLENGE
+
+  # Deny everything else that didn't match above
+  - name: deny-all-remaining
+    user_agent_regex: >-
+      .*
+    action: DENY
+
+storage:
+  backend: bbolt
+  bbolt:
+    path: /data/anubis.db
