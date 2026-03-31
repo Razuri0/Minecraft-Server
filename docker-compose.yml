@@ -1,16 +1,14 @@
 services:
 
-# Minecraft Router
-# A lightweight TCP router to route incoming Minecraft connections to the appropriate server based on the domain name
   mc-router:
       image: itzg/mc-router
       container_name: mc-router
       restart: unless-stopped
       ports:
-        - "25565:25565" # Minecraft default port
+        - "25565:25565"
       environment:
         # Format: domain=container_name:port
-        - MAPPING=<yourdomain.com>=minecraft-server:25565 # Replace <yourdomain.com> with your actual domain
+        - MAPPING=<yourdomain.com>=minecraft-server:25565,<yourdomain2.com>=minecraft-server2:25565 # Replace <yourdomain.com> with your actual domain
       networks:
         - minecraft-network
 
@@ -22,26 +20,36 @@ services:
     stdin_open: true
     tty: true
     restart: unless-stopped
-    cpuset: "0-15"          # ← Cores (adjust range to match your hardware)
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+    # The entrypoint script is to bind the Minecraft server to the CPU and Memory of NUMA node 0, which can help improve performance on multi CPUs setups.
+    entrypoint: >
+      bash -c "
+      microdnf install -y numactl-libs numactl &&
+      CPUS=$$(numactl -H | grep 'node 0 cpus' | cut -d: -f2 | awk '{$1=$1;print}' | sed 's/ /,/g') &&
+      echo 'Detected Node 0 CPUs: '$$CPUS &&
+      exec numactl --physcpubind=$$CPUS --membind=0 /start
+      "
     stop_grace_period: 1m
     environment:
       EULA: "TRUE"
       TYPE: "FABRIC"
       VERSION: "1.21.11"
       FABRIC_VERSION: "0.18.5"
-      MEMORY: "10000M" # ← Total memory allocation for the server (adjust as needed)
-      TZ: "Europe/Berlin" # Set your timezone
+      MEMORY: "10G" # <-- Adjust this based on your server's available RAM
       JVM_OPTS: >
         --add-modules=jdk.incubator.vector
         -XX:+UseZGC
         -XX:-ZProactive
-        -XX:SoftMaxHeapSize=$((Memory - 2048))M
+        -XX:SoftMaxHeapSize=28G
         -XX:+UnlockExperimentalVMOptions
         -XX:+UnlockDiagnosticVMOptions
         -XX:+DisableExplicitGC
         -XX:+AlwaysPreTouch
-        -XX:+PerfDisableSharedMem
         -XX:+UseNUMA
+        -XX:+PerfDisableSharedMem
         -XX:-DontCompileHugeMethods
         -XX:MaxNodeLimit=240000
         -XX:NodeLimitFudgeFactor=8000
@@ -158,14 +166,15 @@ services:
 
 # DDNS Client for DuckDNS
 # keeps your dynamic IP address updated with DuckDNS Domain
+# using DuckDNS because you get 5 free domains and easy to set up
   ddns:
     image: lscr.io/linuxserver/duckdns:latest
     container_name: ddns
     restart: unless-stopped
     environment:
-      - TZ=Europe/Berlin # Set your timezone
-      - SUBDOMAINS=<DUCKDNS_SUBDOMAIN> # Your DuckDNS subdomain (without .duckdns.org)
-      - TOKEN=<DUCKDNS_TOKEN> # Your DuckDNS token
+      - TZ=Europe/Berlin # <-- Set your timezone
+      - SUBDOMAINS=<DUCKDNS_SUBDOMAIN> # <-- Your DuckDNS subdomain (without .duckdns.org)
+      - TOKEN=<DUCKDNS_TOKEN> # <-- Your DuckDNS token
       - PUID=1000
       - PGID=1000
 
