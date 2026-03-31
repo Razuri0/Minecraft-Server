@@ -1,65 +1,75 @@
 # Minecraft-Server
 
-Docker-based Minecraft stack with:
+Docker Compose stack for running a Fabric Minecraft server with routing, file distribution, reverse proxying, and dynamic DNS.
 
-- Fabric Minecraft server (Java 25 image)
-- Miniserve for sharing files (modpacks, configs, etc.)
-- Anubis bot/challenge proxy in front of Miniserve
-- Nginx Proxy Manager (NPM) for reverse proxy and TLS
-- DuckDNS client for dynamic DNS updates
+## Stack Overview
 
-## Overview
+This repository includes:
 
-This repository hosts a self-managed Minecraft setup using Docker Compose.
-The game server data is persisted under `serverdata/`, while file-sharing and reverse-proxy components are included in the same stack.
-
-## Services
-
-Defined in `docker-compose.yml`:
-
-- `server`: Minecraft Fabric server (`itzg/minecraft-server:java25`)
-- `miniserve`: Simple HTTP file server for the `data/` folder
-- `anubis`: Bot mitigation/challenge layer targeting Miniserve
-- `npm`: Nginx Proxy Manager (ports `80`, `443`, `81`)
+- `server`: Fabric Minecraft server (`itzg/minecraft-server:java25-graalvm`)
+- `mc-router`: domain-based Minecraft router (`itzg/mc-router`)
+- `miniserve`: simple HTTP file server for `./data`
+- `anubis`: bot/challenge proxy in front of Miniserve
+- `npm`: Nginx Proxy Manager for reverse proxy and TLS (`80`, `443`, `81`)
 - `ddns`: DuckDNS updater container
 
-## Repository Layout
+Persistent game files are stored in `./serverdata`.
 
-- `docker-compose.yml`: Main stack definition
-- `botPolicy.yaml`: Anubis bot/challenge policy
-- `serverdata/`: Persistent Minecraft server data and world files
-- `data/`: Files exposed through Miniserve
-- `npm/data/`: Nginx Proxy Manager runtime state
-- `npm/letsencrypt/`: TLS certificates for Nginx Proxy Manager
+## Files
+
+- `docker-compose.yml`: service definitions and runtime configuration
+- `botPolicy.yaml`: Anubis ruleset used by the `anubis` container
+- `serverdata/`: Minecraft world, configs, and runtime data
+- `data/`: files served by Miniserve
+- `npm/data/`: Nginx Proxy Manager application data
+- `npm/letsencrypt/`: certificates managed by Nginx Proxy Manager
 
 ## Prerequisites
 
-- Docker Engine 24+
-- Docker Compose plugin (`docker compose`)
-- A host with enough RAM for Java + containers (this stack is configured for 10G JVM heap)
+- Docker Engine with Compose plugin (`docker compose`)
+- Public domain names (for `mc-router` mappings)
+- DuckDNS account/token (if using bundled DDNS service)
+- Enough RAM for JVM + containers (Minecraft container is set to `MEMORY=10G`)
 
-## Quick Start
+## Required Configuration Before First Run
 
-1. Clone/open this repository on your server host.
-2. Review and update environment placeholders in `docker-compose.yml`:
-	 - `SUBDOMAINS=<DUCKDNS_SUBDOMAIN>`
-	 - `TOKEN=<DUCKDNS_TOKEN>`
-3. Start the stack:
+Edit placeholders in `docker-compose.yml`:
+
+1. `mc-router` mapping:
+
+```text
+MAPPING=<yourdomain.com>=minecraft-server:25565,<yourdomain2.com>=minecraft-server2:25565
+```
+
+2. DuckDNS values for `ddns`:
+
+```text
+SUBDOMAINS=<DUCKDNS_SUBDOMAIN>
+TOKEN=<DUCKDNS_TOKEN>
+TZ=Europe/Berlin
+```
+
+## Start
 
 ```bash
 docker compose up -d
+docker compose ps
 ```
 
-4. Check container health/logs:
+Check startup logs:
 
 ```bash
-docker compose ps
-docker compose logs -f server
+docker compose logs --tail=200 server
+docker compose logs --tail=200 mc-router
 ```
 
-5. open Nginx Admin portal 
+## Access
 
-## Common Operations
+- Minecraft entrypoint: host TCP `25565` (via `mc-router`)
+- Nginx Proxy Manager UI: `http://<host>:81`
+- Public web/file endpoint: configure in NPM to route to `anubis`
+
+## Common Commands
 
 Start/stop/restart:
 
@@ -73,96 +83,77 @@ Follow logs:
 
 ```bash
 docker compose logs -f server
+docker compose logs -f mc-router
 docker compose logs -f anubis
 docker compose logs -f npm
+docker compose logs -f ddns
 ```
 
-Graceful Minecraft console access:
+Minecraft console attach:
 
 ```bash
 docker attach minecraft-server
 # Detach without stopping: Ctrl+P, Ctrl+Q
 ```
 
-## Minecraft Configuration
+## Minecraft Service Notes
 
-Core Minecraft settings are in `serverdata/server.properties`.
-
-Current notable settings:
-
-- `enable-rcon=true`
-- `server-port=25565`
-- `max-players=20`
-- `difficulty=easy`
-- `gamemode=survival`
-
-Fabric + version selection is controlled by compose environment values:
+Configured in compose:
 
 - `TYPE=FABRIC`
 - `VERSION=1.21.11`
 - `FABRIC_VERSION=0.18.5`
+- `MEMORY=10G`
 
-## Web and File Access
+The server mounts `./serverdata:/data`, so all world/config files persist across container restarts.
 
-- Miniserve serves `./data` internally on container port `8080`.
-- Anubis listens on host port `8923` and proxies to Miniserve.
-- Nginx Proxy Manager admin UI is exposed on `http://<host>:81`.
+## Anubis Policy
 
-Use NPM to create your public reverse proxy hostnames and TLS certs.
+`botPolicy.yaml` currently:
 
-## Security Notes
+- imports built-in deny/allow lists
+- allows local/private CIDRs
+- allows `robots.txt` and `favicon.ico`
+- challenges browser-like user agents
+- denies unmatched traffic
 
-- Do not commit real credentials/tokens.
-- Replace placeholder DuckDNS values before deployment.
-- Rotate sensitive values if they were ever exposed (for example RCON password).
-- Restrict firewall rules to only required inbound ports (`25565`, `80`, `443`, and admin `81` only if needed).
-- Consider disabling direct host exposure of services that are only needed internally.
+Adjust rules if your file distribution endpoint blocks legitimate users.
 
-## Backup
+## Backups
 
 At minimum, back up:
 
-- `serverdata/world/`
-- `serverdata/server.properties`
-- `serverdata/ops.json`, `serverdata/whitelist.json`, `serverdata/banned-*.json`
-- `npm/data/` and `npm/letsencrypt/`
+- `serverdata/`
+- `data/`
+- `npm/data/`
+- `npm/letsencrypt/`
 
-Example quick backup:
+Example:
 
 ```bash
-tar -czf minecraft-backup-$(date +%F).tar.gz serverdata npm/data npm/letsencrypt data
+tar -czf minecraft-backup-$(date +%F).tar.gz serverdata data npm/data npm/letsencrypt
 ```
 
-## Updating
-
-1. Pull updated images:
+## Updates
 
 ```bash
 docker compose pull
-```
-
-2. Recreate containers:
-
-```bash
 docker compose up -d
-```
-
-3. Verify logs and server startup:
-
-```bash
-docker compose logs --tail=200 server
 ```
 
 ## Troubleshooting
 
-- Server not reachable:
-	- Verify `docker compose ps` shows `server` running.
-	- Confirm firewall/NAT forwards TCP `25565`.
-- File server blocked/challenged unexpectedly:
-	- Review `botPolicy.yaml` and `docker compose logs -f anubis`.
-- Reverse proxy issues:
-	- Check NPM logs and host configuration in the NPM admin panel.
+- Cannot connect to Minecraft:
+	- verify `docker compose ps`
+	- confirm firewall/NAT for TCP `25565`
+	- validate `mc-router` `MAPPING` values
+- File endpoint inaccessible:
+	- inspect `docker compose logs -f anubis`
+	- review `botPolicy.yaml`
+- Reverse proxy/TLS problems:
+	- inspect `docker compose logs -f npm`
+	- verify NPM host entries and certificates
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

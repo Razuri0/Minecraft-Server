@@ -43,7 +43,6 @@ services:
         --add-modules=jdk.incubator.vector
         -XX:+UseZGC
         -XX:-ZProactive
-        -XX:SoftMaxHeapSize=28G
         -XX:+UnlockExperimentalVMOptions
         -XX:+UnlockDiagnosticVMOptions
         -XX:+DisableExplicitGC
