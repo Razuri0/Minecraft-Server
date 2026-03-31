@@ -29,7 +29,6 @@ Persistent game files are stored in `./serverdata`.
 - Docker Engine with Compose plugin (`docker compose`)
 - Public domain names (for `mc-router` mappings)
 - DuckDNS account/token (if using bundled DDNS service)
-- Enough RAM for JVM + containers (Minecraft container is set to `MEMORY=10G`)
 
 ## Required Configuration Before First Run
 
@@ -104,6 +103,8 @@ Configured in compose:
 - `VERSION=1.21.11`
 - `FABRIC_VERSION=0.18.5`
 - `MEMORY=10G`
+
+for more information see [Itzg/minecraft](https://docker-minecraft-server.readthedocs.io/en/latest/)
 
 The server mounts `./serverdata:/data`, so all world/config files persist across container restarts.
 
