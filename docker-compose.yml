@@ -8,7 +8,7 @@ services:
         - "25565:25565"
       environment:
         # Format: domain=container_name:port
-        - MAPPING=<yourdomain.com>=minecraft-server:25565,<yourdomain2.com>=minecraft-server2:25565 # Replace <yourdomain.com> with your actual domain
+        - MAPPING=<yourdomain.com>=minecraft-server:25565,<yourdomain2.com>=minecraft-server2:25565 # <-- Replace <yourdomain.com> with your actual domain
       networks:
         - minecraft-network
 
