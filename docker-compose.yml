@@ -1,129 +1,71 @@
 services:
 
   mc-router:
-      image: itzg/mc-router
+      image: itzg/mc-router:1.44.0
       container_name: mc-router
       restart: unless-stopped
+      user: "${PUID:-1000}:${PGID:-1000}"
       ports:
         - "25565:25565"
       environment:
-        # Format: domain=container_name:port
-        - MAPPING=<yourdomain.com>=minecraft-server:25565,<yourdomain2.com>=minecraft-server2:25565 # <-- Replace <yourdomain.com> with your actual domain
+        # Format: domain=container_name:port, domain2=container_name2:port2...
+        - MAPPING=${MC_DOMAIN}=minecraftServer:25565
       networks:
         - minecraft-network
 
 # Minecraft Server
-# Using Java 25 for newer JVM arguments, and Fabric for modding
+# Using Java 25 for newer JVM arguments
   server:
     image: itzg/minecraft-server:java25-graalvm
-    container_name: minecraft-server
+    container_name: minecraftServer
     stdin_open: true
     tty: true
     restart: unless-stopped
-    cap_add:
-      - SYS_ADMIN
-    security_opt:
-      - seccomp:unconfined
-    # The entrypoint script is to bind the Minecraft server to the CPU and Memory of NUMA node 0, which can help improve performance on multi CPUs setups.
-    entrypoint: >
-      bash -c "
-      microdnf install -y numactl-libs numactl &&
-      CPUS=$$(numactl -H | grep 'node 0 cpus' | cut -d: -f2 | awk '{$1=$1;print}' | sed 's/ /,/g') &&
-      echo 'Detected Node 0 CPUs: '$$CPUS &&
-      exec numactl --physcpubind=$$CPUS --membind=0 /start
-      "
-    stop_grace_period: 1m
+    # Runs as your host user instead of root; the image detects this and skips
+    # its own privilege-drop. ./serverdata must be writable by this user
+    # (make setup creates it with the right owner).
+    user: "${PUID:-1000}:${PGID:-1000}"
+    # Pin the server to the CPUs of one NUMA node (set MC_CPUSET in .env).
+    # Memory follows automatically: Linux allocates on the node a thread runs on,
+    # and -XX:+AlwaysPreTouch touches the whole heap at startup from those CPUs.
+    # Leave MC_CPUSET empty to use all CPUs.
+    cpuset: "${MC_CPUSET:-}"
+    stop_grace_period: 2m
     environment:
       EULA: "TRUE"
-      TYPE: "FABRIC"
-      VERSION: "1.21.11"
-      FABRIC_VERSION: "0.18.5"
-      MEMORY: "10G" # <-- Adjust this based on your server's available RAM
+      VERSION: "${MC_VERSION}"
+      TYPE: "${MC_TYPE}" # VANILLA, FABRIC, NEOFORGE, or FORGE
+      # Loader version for the selected TYPE - only the variable matching TYPE
+      # is read by the image, the others are ignored.
+      # Empty = latest (Fabric/NeoForge) or recommended (Forge).
+      FABRIC_LOADER_VERSION: "${MOD_LOADER_VERSION:-}"
+      NEOFORGE_VERSION: "${MOD_LOADER_VERSION:-}"
+      FORGE_VERSION: "${MOD_LOADER_VERSION:-}"
+      MEMORY: "${MC_MEMORY}"
       JVM_OPTS: >
-        --add-modules=jdk.incubator.vector
         -XX:+UseZGC
-        -XX:-ZProactive
-        -XX:+UnlockExperimentalVMOptions
-        -XX:+UnlockDiagnosticVMOptions
-        -XX:+DisableExplicitGC
         -XX:+AlwaysPreTouch
-        -XX:+UseNUMA
-        -XX:+PerfDisableSharedMem
-        -XX:-DontCompileHugeMethods
-        -XX:MaxNodeLimit=240000
-        -XX:NodeLimitFudgeFactor=8000
-        -XX:ReservedCodeCacheSize=400M
-        -XX:NonNMethodCodeHeapSize=12M
-        -XX:ProfiledCodeHeapSize=194M
-        -XX:NonProfiledCodeHeapSize=194M
-        -XX:NmethodSweepActivity=1
-        -XX:+UseFastUnorderedTimeStamps
-        -XX:+UseCriticalJavaThreadPriority
-        -XX:AllocatePrefetchStyle=1
-        -XX:+AlwaysActAsServerClassMachine
         -XX:+UseTransparentHugePages
-        -XX:LargePageSizeInBytes=2M
-        -XX:+UseLargePages
+        -XX:+DisableExplicitGC
+        -XX:+PerfDisableSharedMem
+        -XX:ReservedCodeCacheSize=400M
+        --add-modules=jdk.incubator.vector
         -XX:+EagerJVMCI
-        -XX:+UseStringDeduplication
-        -XX:+UseAES
-        -XX:+UseAESIntrinsics
-        -XX:+UseFMA
-        -XX:+UseLoopPredicate
-        -XX:+RangeCheckElimination
-        -XX:+OptimizeStringConcat
-        -XX:+UseCompressedOops
-        -XX:+UseThreadPriorities
-        -XX:+OmitStackTraceInFastThrow
-        -XX:+RewriteBytecodes
-        -XX:+RewriteFrequentPairs
-        -XX:+UseFPUForSpilling
-        -XX:+UseFastStosb
-        -XX:+UseNewLongLShift
-        -XX:+UseVectorCmov
-        -XX:+UseXMMForArrayCopy
-        -XX:+UseXmmI2D
-        -XX:+UseXmmI2F
-        -XX:+UseXmmLoadAndClearUpper
-        -XX:+UseXmmRegToRegMoveAll
-        -XX:+EliminateLocks
-        -XX:+DoEscapeAnalysis
-        -XX:+AlignVector
-        -XX:+OptimizeFill
-        -XX:+EnableVectorSupport
-        -XX:+UseCharacterCompareIntrinsics
-        -XX:+UseCopySignIntrinsic
-        -XX:+UseVectorStubs
-        -XX:UseAVX=2
-        -XX:UseSSE=4
-        -XX:+UseFastJNIAccessors
-        -XX:+UseInlineCaches
-        -XX:+SegmentedCodeCache
         -Djdk.nio.maxCachedBufferSize=262144
-        -Djdk.graal.UsePriorityInlining=true
-        -Djdk.graal.Vectorization=true
-        -Djdk.graal.OptDuplication=true
-        -Djdk.graal.DetectInvertedLoopsAsCounted=true
-        -Djdk.graal.LoopInversion=true
-        -Djdk.graal.VectorizeHashes=true
-        -Djdk.graal.EnterprisePartialUnroll=true
-        -Djdk.graal.VectorizeSIMD=true
-        -Djdk.graal.StripMineNonCountedLoops=true
-        -Djdk.graal.SpeculativeGuardMovement=true
-        -Djdk.graal.TuneInlinerExploration=1
-        -Djdk.graal.LoopRotation=true
-        -Djdk.graal.CompilerConfiguration=enterprise
+        -XX:+UseCompactObjectHeaders
+        -Dchunky.maxWorkingCount=2048
     volumes:
       - ./serverdata:/data
     networks:
       - minecraft-network
 
-# Miniserve: A simple and efficient file server for sharing files over HTTP.
-# for sharing modpack, configs, and other files related to the Minecraft server.
+# Miniserve: A simple file server for sharing files over HTTP.
+# for sharing modpacks, configs, and other files related to the Minecraft server.
   miniserve:
-    image: svenstaro/miniserve:latesta
+    image: svenstaro/miniserve:0.35.0
     container_name: miniserve
     restart: unless-stopped
+    user: "${PUID:-1000}:${PGID:-1000}"
     volumes:
       - ./data:/data
     command: -v --enable-tar --enable-zip /data
@@ -131,16 +73,20 @@ services:
       - file-network
 
 # Anubis
-# A lightweight reverse proxy and bot mitigation tool to protect the Miniserve file server from malicious bots and crawlers.
+# Reverse proxy and bot mitigation tool to protect the Miniserve file server from malicious bots and crawlers.
   anubis:
-    image: ghcr.io/techarohq/anubis:latest
+    image: ghcr.io/techarohq/anubis:v1.25.0
     container_name: anubis
     restart: unless-stopped
+    user: "${PUID:-1000}:${PGID:-1000}"
     environment:
       - BIND=:8923
       - TARGET=http://miniserve:8080
       - POLICY_FNAME=/data/cfg/botPolicy.yaml
     volumes:
+      # persists the challenge database (bbolt) across restarts;
+      # bind mount (not named volume) so it's owned by your host user
+      - ./anubis-data:/data
       - ./botPolicy.yaml:/data/cfg/botPolicy.yaml:ro
     networks:
       - file-network
@@ -148,11 +94,16 @@ services:
       - miniserve
 
 # Nginx Proxy Manager
-# for managing reverse proxies, SSL certificates, and access control for the Minecraft server and Miniserve.
+# for managing reverse proxies, SSL certificates, and access control for Miniserve.
+# s6-based image: must start as root to bind ports 80/443 and set up its
+# services, then drops the app processes to PUID/PGID itself.
   npm:
-    image: jc21/nginx-proxy-manager:latest
+    image: jc21/nginx-proxy-manager:2.15.1
     container_name: nginx-proxy-manager
     restart: unless-stopped
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
     ports:
       - "80:80"
       - "443:443"
@@ -166,16 +117,18 @@ services:
 # DDNS Client for DuckDNS
 # keeps your dynamic IP address updated with DuckDNS Domain
 # using DuckDNS because you get 5 free domains and easy to set up
+# (left on :latest on purpose - linuxserver.io only publishes hash-based tags)
+# s6-based image like npm: starts as root, drops to PUID/PGID itself.
   ddns:
     image: lscr.io/linuxserver/duckdns:latest
     container_name: ddns
     restart: unless-stopped
     environment:
-      - TZ=Europe/Berlin # <-- Set your timezone
-      - SUBDOMAINS=<DUCKDNS_SUBDOMAIN> # <-- Your DuckDNS subdomain (without .duckdns.org)
-      - TOKEN=<DUCKDNS_TOKEN> # <-- Your DuckDNS token
-      - PUID=1000
-      - PGID=1000
+      - TZ=${TZ}
+      - SUBDOMAINS=${DUCKDNS_SUBDOMAINS}
+      - TOKEN=${DUCKDNS_TOKEN}
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
 
 networks:
   minecraft-network:

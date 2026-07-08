@@ -1,3 +1,9 @@
+### --- Run `make setup` to create botPolicy.yaml file using this template --- ###
+# or manually create and copy this file to botPolicy.yaml
+# then fill in your values:
+
+# botPolicy.yaml is gitignored, changes can be pulled from the repo without overwriting your values.
+
 # botPolicy.yaml for miniserve file server
 
 bots:

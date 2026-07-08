@@ -1,12 +1,12 @@
 # Minecraft-Server
 
-Docker Compose stack for running a Fabric Minecraft server with routing, file distribution, reverse proxying, and dynamic DNS.
+Docker Compose stack for running a Minecraft server (Vanilla, Fabric, NeoForge, or Forge) with routing, file distribution, reverse proxying, and dynamic DNS.
 
 ## Stack Overview
 
 This repository includes:
 
-- `server`: Fabric Minecraft server (`itzg/minecraft-server:java25-graalvm`)
+- `server`: Minecraft server (`itzg/minecraft-server:java25-graalvm`)
 - `mc-router`: domain-based Minecraft router (`itzg/mc-router`)
 - `miniserve`: simple HTTP file server for `./data`
 - `anubis`: bot/challenge proxy in front of Miniserve
@@ -18,6 +18,9 @@ Persistent game files are stored in `./serverdata`.
 ## Files
 
 - `docker-compose.yml`: service definitions and runtime configuration
+- `.env.example`: template for all user-specific values (copy to `.env`)
+- `.env`: your actual configuration (gitignored, never commit this)
+- `Makefile`: `make setup` creates `.env`, sets `PUID`/`PGID`, detects NUMA node 0 CPUs and writes `MC_CPUSET` into `.env`
 - `botPolicy.yaml`: Anubis ruleset used by the `anubis` container
 - `serverdata/`: Minecraft world, configs, and runtime data
 - `data/`: files served by Miniserve
@@ -32,34 +35,41 @@ Persistent game files are stored in `./serverdata`.
 
 ## Required Configuration Before First Run
 
-Edit placeholders in `docker-compose.yml`:
+Copy the template and fill in your values:
 
-1. `mc-router` mapping:
-
-```text
-MAPPING=<yourdomain.com>=minecraft-server:25565,<yourdomain2.com>=minecraft-server2:25565
+```bash
+cp .env.example .env
 ```
 
-2. DuckDNS values for `ddns`:
+Then edit `.env`:
 
-```text
-SUBDOMAINS=<DUCKDNS_SUBDOMAIN>
-TOKEN=<DUCKDNS_TOKEN>
-TZ=Europe/Berlin
+- `MC_DOMAIN`: domain players connect with (routed by `mc-router`)
+- `MC_VERSION`: Minecraft version, e.g. `1.21.11` or `LATEST`
+- `MC_TYPE`: `VANILLA`, `FABRIC`, `NEOFORGE`, or `FORGE`
+- `MOD_LOADER_VERSION`: loader version for the chosen type; empty = latest/recommended
+- `MC_MEMORY`: JVM heap size, e.g. `10G`
+- `MC_CPUSET`: CPUs to pin the server to on multi-CPU (NUMA) machines; empty = all CPUs
+- `TZ`, `DUCKDNS_SUBDOMAINS`, `DUCKDNS_TOKEN`: DuckDNS updater settings
+
+Then run one-time setup, which sets `PUID`/`PGID` and `MC_CPUSET` automatically:
+
+```bash
+make setup
 ```
+
+This detects the machine's NUMA topology and writes the node 0 CPU list into `MC_CPUSET` in `.env` (left empty on single-CPU machines, where pinning is unnecessary). Re-run it after hardware changes.
 
 ## Start
 
 ```bash
-docker compose up -d
-docker compose ps
+make run
+make ps
 ```
 
-Check startup logs:
+Check logs (Ctrl+C to stop following):
 
 ```bash
-docker compose logs --tail=200 server
-docker compose logs --tail=200 mc-router
+make logs
 ```
 
 ## Access
@@ -73,36 +83,31 @@ docker compose logs --tail=200 mc-router
 Start/stop/restart:
 
 ```bash
-docker compose up -d
-docker compose stop
-docker compose restart
+make run
+make stop
+make restart
 ```
 
-Follow logs:
+Follow logs from all services (`make logs`), or a single one:
 
 ```bash
+make logs
 docker compose logs -f server
 docker compose logs -f mc-router
-docker compose logs -f anubis
-docker compose logs -f npm
-docker compose logs -f ddns
 ```
+
+Run `make` with no arguments to list all available commands.
 
 Minecraft console attach:
 
 ```bash
-docker attach minecraft-server
+docker attach minecraftServer1
 # Detach without stopping: Ctrl+P, Ctrl+Q
 ```
 
 ## Minecraft Service Notes
 
-Configured in compose:
-
-- `TYPE=FABRIC`
-- `VERSION=1.21.11`
-- `FABRIC_VERSION=0.18.5`
-- `MEMORY=10G`
+Server type, Minecraft version, mod loader version, memory, and CPU pinning are all set in `.env` (see above). CPU pinning (`MC_CPUSET`) is meant for multi-CPU machines: pinning the server to the CPUs of one NUMA node keeps its memory local. Run `make setup` to detect and set it automatically.
 
 for more information see [Itzg/minecraft](https://docker-minecraft-server.readthedocs.io/en/latest/)
 
@@ -124,22 +129,22 @@ Adjust rules if your file distribution endpoint blocks legitimate users.
 
 At minimum, back up:
 
+- `.env`
 - `serverdata/`
 - `data/`
 - `npm/data/`
 - `npm/letsencrypt/`
 
-Example:
+Run `make backup` to write a timestamped archive of all of the above:
 
 ```bash
-tar -czf minecraft-backup-$(date +%F).tar.gz serverdata data npm/data npm/letsencrypt
+make backup   # -> minecraft-backup-YYYY-MM-DD.tar.gz
 ```
 
 ## Updates
 
 ```bash
-docker compose pull
-docker compose up -d
+make update   # docker compose pull && up -d
 ```
 
 ## Troubleshooting
@@ -154,7 +159,3 @@ docker compose up -d
 - Reverse proxy/TLS problems:
 	- inspect `docker compose logs -f npm`
 	- verify NPM host entries and certificates
-
-## License
-
-MIT. See [LICENSE](LICENSE).

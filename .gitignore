@@ -1,3 +1,5 @@
 data
 npm
 serverdata
+.env
+botPolicy.yaml
