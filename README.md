@@ -35,10 +35,19 @@ Persistent game files are stored in `./serverdata`.
 
 ## Required Configuration Before First Run
 
+Run one-time setup, which sets `PUID`/`PGID` and `MC_CPUSET` automatically:
+
+```bash
+make setup
+```
+
+Alternativly setup .evn and botPolicy.yaml manually
+
 Copy the template and fill in your values:
 
 ```bash
 cp .env.example .env
+cp botPolicy.yaml.example botPolicy.yaml
 ```
 
 Then edit `.env`:
@@ -51,13 +60,7 @@ Then edit `.env`:
 - `MC_CPUSET`: CPUs to pin the server to on multi-CPU (NUMA) machines; empty = all CPUs
 - `TZ`, `DUCKDNS_SUBDOMAINS`, `DUCKDNS_TOKEN`: DuckDNS updater settings
 
-Then run one-time setup, which sets `PUID`/`PGID` and `MC_CPUSET` automatically:
-
-```bash
-make setup
-```
-
-This detects the machine's NUMA topology and writes the node 0 CPU list into `MC_CPUSET` in `.env` (left empty on single-CPU machines, where pinning is unnecessary). Re-run it after hardware changes.
+If using the setup script machine's NUMA topology is automatically detected and node 0 CPU list is written into `MC_CPUSET` in `.env` (left empty on single-CPU machines, where pinning is unnecessary). Re-run it after hardware changes.
 
 ## Start
 
@@ -66,10 +69,16 @@ make run
 make ps
 ```
 
-Check logs (Ctrl+C to stop following):
+Check logs (Ctrl+C to exit):
 
 ```bash
 make logs
+```
+
+Open Minecraft Console (Ctrl+P followed by Ctrl+Q to exit)
+
+```bash
+make console
 ```
 
 ## Access
@@ -97,13 +106,6 @@ docker compose logs -f mc-router
 ```
 
 Run `make` with no arguments to list all available commands.
-
-Minecraft console attach:
-
-```bash
-docker attach minecraftServer1
-# Detach without stopping: Ctrl+P, Ctrl+Q
-```
 
 ## Minecraft Service Notes
 

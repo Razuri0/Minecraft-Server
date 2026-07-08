@@ -64,6 +64,10 @@ restart:
 logs:
 	docker compose logs -f
 
+# Attach to the Minecraft server console to view output and send commands. Use Ctrl+P followed by Ctrl+Q to detach without stopping the server.
+console:
+	docker attach minecraft-server
+
 # Show container status
 ps:
 	docker compose ps
