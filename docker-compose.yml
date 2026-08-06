@@ -7,10 +7,12 @@ services:
       ports:
         - "25565:25565"
       environment:
+        auto-scale-webhook-timeout: "5m"
+        auto-scale-webhook-wake-timeout: "5m"
         IN_DOCKER: true
         AUTO_SCALE_DOWN: true
         AUTO_SCALE_UP: true
-        AUTO_SCALE_DOWN_AFTER: 10m
+        AUTO_SCALE_DOWN_AFTER: 30m
         AUTO_SCALE_ASLEEP_MOTD: "Server is asleep. Join again to wake it up!"
 
       networks:
@@ -23,7 +25,6 @@ services:
     container_name: minecraftServer
     labels:
       mc-router.host: ${MC_DOMAIN}
-      mc-router.auto-scale-wait-timeout: "5m"
     stdin_open: true
     tty: true
     restart: unless-stopped
