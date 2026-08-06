@@ -16,7 +16,7 @@ services:
 # Minecraft Server
 # Using Java 25 for newer JVM arguments
   server:
-    image: itzg/minecraft-server:java25-graalvm
+    image: itzg/minecraft-server:java25-alpine
     container_name: minecraftServer
     stdin_open: true
     tty: true
