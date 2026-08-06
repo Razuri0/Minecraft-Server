@@ -46,12 +46,8 @@ services:
         -XX:+UseZGC
         -XX:+AlwaysPreTouch
         -XX:+UseTransparentHugePages
-        -XX:+DisableExplicitGC
-        -XX:+PerfDisableSharedMem
-        -XX:ReservedCodeCacheSize=400M
         --add-modules=jdk.incubator.vector
-        -XX:+EagerJVMCI
-        -Djdk.nio.maxCachedBufferSize=262144
+        -XX:+UseStringDeduplication
         -XX:+UseCompactObjectHeaders
         -Dchunky.maxWorkingCount=2048
     volumes:
