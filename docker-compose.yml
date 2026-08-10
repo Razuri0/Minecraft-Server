@@ -37,6 +37,8 @@ services:
     # and -XX:+AlwaysPreTouch touches the whole heap at startup from those CPUs.
     # Leave MC_CPUSET empty to use all CPUs.
     cpuset: "${MC_CPUSET:-}"
+    # URL to the packwiz pack used by this server
+    PACKWIZ_URL: "${PACKWIZ_URL}"
     stop_grace_period: 2m
     environment:
       EULA: "TRUE"
@@ -61,61 +63,38 @@ services:
       - ./serverdata:/data
     networks:
       - minecraft-network
-
-# Miniserve: A simple file server for sharing files over HTTP.
-# for sharing modpacks, configs, and other files related to the Minecraft server.
-  miniserve:
-    image: svenstaro/miniserve:latest
-    container_name: miniserve
-    restart: unless-stopped
-    user: "${PUID:-1000}:${PGID:-1000}"
-    volumes:
-      - ./data:/data
-    command: -v --enable-tar --enable-zip /data
-    networks:
       - file-network
 
-# Anubis
-# Reverse proxy and bot mitigation tool to protect the Miniserve file server from malicious bots and crawlers.
-  anubis:
-    image: ghcr.io/techarohq/anubis:latest
-    container_name: anubis
-    restart: unless-stopped
-    user: "${PUID:-1000}:${PGID:-1000}"
-    environment:
-      - BIND=:8923
-      - TARGET=http://miniserve:8080
-      - POLICY_FNAME=/data/cfg/botPolicy.yaml
-    volumes:
-      # persists the challenge database (bbolt) across restarts;
-      # bind mount (not named volume) so it's owned by your host user
-      - ./anubis-data:/data
-      - ./botPolicy.yaml:/data/cfg/botPolicy.yaml:ro
-    networks:
-      - file-network
-    depends_on:
-      - miniserve
+# Miniserve: lightweight HTTP file server for packwiz and other files.
+miniserve:
+  image: svenstaro/miniserve:latest
+  container_name: miniserve
+  restart: unless-stopped
+  user: "${PUID:-1000}:${PGID:-1000}"
+  volumes:
+    - ./data:/data
+  command: -v --enable-tar --enable-zip /data
+  networks:
+    - file-network
 
 # Nginx Proxy Manager
-# for managing reverse proxies, SSL certificates, and access control for Miniserve.
-# s6-based image: must start as root to bind ports 80/443 and set up its
-# services, then drops the app processes to PUID/PGID itself.
-  npm:
-    image: jc21/nginx-proxy-manager:latest
-    container_name: nginx-proxy-manager
-    restart: unless-stopped
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "81:81"
-    volumes:
-      - ./npm/data:/data
-      - ./npm/letsencrypt:/etc/letsencrypt
-    networks:
-      - file-network
+# Handles HTTPS/SSL and reverse proxies to Miniserve.
+npm:
+  image: jc21/nginx-proxy-manager:latest
+  container_name: nginx-proxy-manager
+  restart: unless-stopped
+  environment:
+    - PUID=${PUID:-1000}
+    - PGID=${PGID:-1000}
+  ports:
+    - "80:80"
+    - "443:443"
+    - "81:81"
+  volumes:
+    - ./npm/data:/data
+    - ./npm/letsencrypt:/etc/letsencrypt
+  networks:
+    - file-network
 
 # DDNS Client for DuckDNS
 # keeps your dynamic IP address updated with DuckDNS Domain

@@ -9,7 +9,6 @@ This repository includes:
 - `server`: Minecraft server (`itzg/minecraft-server:java25-graalvm`)
 - `mc-router`: domain-based Minecraft router (`itzg/mc-router`)
 - `miniserve`: simple HTTP file server for `./data`
-- `anubis`: bot/challenge proxy in front of Miniserve
 - `npm`: Nginx Proxy Manager for reverse proxy and TLS (`80`, `443`, `81`)
 - `ddns`: DuckDNS updater container
 
@@ -85,7 +84,7 @@ make console
 
 - Minecraft entrypoint: host TCP `25565` (via `mc-router`)
 - Nginx Proxy Manager UI: `http://<host>:81`
-- Public web/file endpoint: configure in NPM to route to `anubis`
+- Public web/file endpoint: configure in NPM to route to `miniserve`
 
 ## Common Commands
 
@@ -115,17 +114,6 @@ for more information see [Itzg/minecraft](https://docker-minecraft-server.readth
 
 The server mounts `./serverdata:/data`, so all world/config files persist across container restarts.
 
-## Anubis Policy
-
-`botPolicy.yaml` currently:
-
-- imports built-in deny/allow lists
-- allows local/private CIDRs
-- allows `robots.txt` and `favicon.ico`
-- challenges browser-like user agents
-- denies unmatched traffic
-
-Adjust rules if your file distribution endpoint blocks legitimate users.
 
 ## Backups
 
@@ -148,16 +136,3 @@ make backup   # -> minecraft-backup-YYYY-MM-DD.tar.gz
 ```bash
 make update   # docker compose pull && up -d
 ```
-
-## Troubleshooting
-
-- Cannot connect to Minecraft:
-	- verify `docker compose ps`
-	- confirm firewall/NAT for TCP `25565`
-	- validate `mc-router` `MAPPING` values
-- File endpoint inaccessible:
-	- inspect `docker compose logs -f anubis`
-	- review `botPolicy.yaml`
-- Reverse proxy/TLS problems:
-	- inspect `docker compose logs -f npm`
-	- verify NPM host entries and certificates
