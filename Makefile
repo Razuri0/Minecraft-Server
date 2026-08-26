@@ -37,9 +37,6 @@ setup:
 	fi; \
 	grep -q '^MC_CPUSET=' .env && sed -i "s/^MC_CPUSET=.*/MC_CPUSET=$$cpuset/" .env || printf 'MC_CPUSET=%s\n' "$$cpuset" >> .env
 
-	@echo "Setting up Anubis bot mitigation policy"
-	test -f botPolicy.yaml || cp botPolicy.yaml.example botPolicy.yaml
-
 	@echo "Creating bind-mount directories as the current user"
 	mkdir -p serverdata data anubis-data npm/data npm/letsencrypt
 
