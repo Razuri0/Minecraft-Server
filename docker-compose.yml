@@ -61,6 +61,9 @@ services:
         -XX:+UseStringDeduplication
         -XX:+UseCompactObjectHeaders
         -Dchunky.maxWorkingCount=2048
+        -XX:ZAllocationSpikeTolerance=2.5
+        -Djdk.graal.CompilerConfiguration=enterprise
+        -Djdk.graal.TuneInlinerExploration=1.0
     volumes:
       - ./serverdata:/data
     networks:
