@@ -12,7 +12,7 @@ services:
         IN_DOCKER: true
         AUTO_SCALE_DOWN: true
         AUTO_SCALE_UP: true
-        AUTO_SCALE_DOWN_AFTER: 30m
+        AUTO_SCALE_DOWN_AFTER: 1h
         AUTO_SCALE_ASLEEP_MOTD: "Server is asleep. Join again to wake it up!"
       depends_on:
         server:
@@ -52,7 +52,19 @@ services:
       FABRIC_LOADER_VERSION: "${MOD_LOADER_VERSION:-}"
       NEOFORGE_VERSION: "${MOD_LOADER_VERSION:-}"
       FORGE_VERSION: "${MOD_LOADER_VERSION:-}"
+      # Container memory limit
       MEMORY: "${MC_MEMORY}"
+      # Server.properties variables (see .env.example for all options)
+      VIEW_DISTANCE: "${VIEW_DISTANCE:-}"
+      SIMULATION_DISTANCE: "${SIMULATION_DISTANCE:-}"
+      ALLOW_FLIGHT: "${ALLOW_FLIGHT:-}"
+      HARDCORE: "${HARDCORE:-}"
+      MAX_TICK_TIME: "${MAX_TICK_TIME:-}"
+      MOTD: "${MOTD:-}"
+      DIFFICULTY: "${DIFFICULTY:-}"
+      GAMEMODE: "${GAMEMODE:-}"
+      MAX_PLAYERS: "${MAX_PLAYERS:-}"
+      # JVM options
       JVM_OPTS: >
         -XX:+UseZGC
         -XX:+AlwaysPreTouch
