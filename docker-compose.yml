@@ -23,6 +23,7 @@ services:
   # Minecraft Server
   # Using Java 25 for newer JVM arguments
   server:
+    # GraalVM Container doesn't work with Forge, so use the regular Java 25 image for Forge servers.
     image: itzg/minecraft-server:java25-graalvm
     container_name: minecraftServer
     labels:
